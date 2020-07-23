@@ -487,11 +487,11 @@ func (t *Transport) roundTrip(req *Request) (*Response, error) {
 	trace := httptrace.ContextClientTrace(ctx)
 
 	if req.URL == nil {
-		req.closeBody()
+		req.closeBody() // BA OK
 		return nil, errors.New("http: nil Request.URL")
 	}
 	if req.Header == nil {
-		req.closeBody()
+		req.closeBody() // BA OK
 		return nil, errors.New("http: nil Request.Header")
 	}
 	scheme := req.URL.Scheme
@@ -499,12 +499,12 @@ func (t *Transport) roundTrip(req *Request) (*Response, error) {
 	if isHTTP {
 		for k, vv := range req.Header {
 			if !httpguts.ValidHeaderFieldName(k) {
-				req.closeBody()
+				req.closeBody() // BA OK
 				return nil, fmt.Errorf("net/http: invalid header field name %q", k)
 			}
 			for _, v := range vv {
 				if !httpguts.ValidHeaderFieldValue(v) {
-					req.closeBody()
+					req.closeBody() // BA OK
 					return nil, fmt.Errorf("net/http: invalid header field value %q for key %v", v, k)
 				}
 			}
@@ -517,22 +517,22 @@ func (t *Transport) roundTrip(req *Request) (*Response, error) {
 		}
 	}
 	if !isHTTP {
-		req.closeBody()
+		req.closeBody() // BA OK
 		return nil, &badStringError{"unsupported protocol scheme", scheme}
 	}
 	if req.Method != "" && !validMethod(req.Method) {
-		req.closeBody()
+		req.closeBody() // BA OK
 		return nil, fmt.Errorf("net/http: invalid method %q", req.Method)
 	}
 	if req.URL.Host == "" {
-		req.closeBody()
+		req.closeBody() // BA OK ?
 		return nil, errors.New("http: no Host in request URL")
 	}
 
 	for {
 		select {
 		case <-ctx.Done():
-			req.closeBody()
+			req.closeBody() // BA ?
 			return nil, ctx.Err()
 		default:
 		}
@@ -541,7 +541,7 @@ func (t *Transport) roundTrip(req *Request) (*Response, error) {
 		treq := &transportRequest{Request: req, trace: trace}
 		cm, err := t.connectMethodForRequest(treq)
 		if err != nil {
-			req.closeBody()
+			req.closeBody() // BA ?
 			return nil, err
 		}
 
@@ -552,7 +552,7 @@ func (t *Transport) roundTrip(req *Request) (*Response, error) {
 		pconn, err := t.getConn(treq, cm)
 		if err != nil {
 			t.setReqCanceler(req, nil)
-			req.closeBody()
+			req.closeBody() // BA ?
 			return nil, err
 		}
 
@@ -562,7 +562,7 @@ func (t *Transport) roundTrip(req *Request) (*Response, error) {
 			t.setReqCanceler(req, nil) // not cancelable with CancelRequest
 			resp, err = pconn.alt.RoundTrip(req)
 		} else {
-			resp, err = pconn.roundTrip(treq)
+			resp, err = pconn.roundTrip(treq) // BA The real ROUNDTRIP ?
 		}
 		if err == nil {
 			return resp, nil
@@ -626,7 +626,7 @@ func (pc *persistConn) shouldRetryRequest(req *Request, err error) bool {
 		// our request (as opposed to sending an error).
 		return false
 	}
-	if _, ok := err.(nothingWrittenError); ok {
+	if _, ok := err.(nothingWrittenError); ok { // BA DID WE RETRY ?
 		// We never wrote anything, so it's safe to retry, if there's no body or we
 		// can "rewind" the body with GetBody.
 		return req.outgoingLength() == 0 || req.GetBody != nil
@@ -2291,6 +2291,8 @@ func (pc *persistConn) writeLoop() {
 			}
 			if err == nil {
 				err = pc.bw.Flush()
+				// fmt.Fprintln(os.Stderr, "Injecting a random error") // Should break
+				// err = errors.New("random")
 			}
 			if err != nil {
 				wr.req.Request.closeBody()
