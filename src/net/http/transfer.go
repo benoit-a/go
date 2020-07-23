@@ -368,12 +368,6 @@ func (t *transferWriter) writeBody(w io.Writer) error {
 			return err
 		}
 	}
-	if t.BodyCloser != nil {
-		if err := t.BodyCloser.Close(); err != nil {
-			return err
-		}
-	}
-
 	if !t.ResponseToHEAD && t.ContentLength != -1 && t.ContentLength != ncopy {
 		return fmt.Errorf("http: ContentLength=%d with Body length %d",
 			t.ContentLength, ncopy)
@@ -389,6 +383,12 @@ func (t *transferWriter) writeBody(w io.Writer) error {
 		// Last chunk, empty trailer
 		_, err = io.WriteString(w, "\r\n")
 	}
+
+	// Only close if no error
+	if t.BodyCloser != nil && err == nil {
+		err = t.BodyCloser.Close()
+	}
+
 	return err
 }
 
